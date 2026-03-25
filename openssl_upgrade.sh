@@ -135,7 +135,7 @@ crack_armor
 
 - name: Get running kernel
       command: uname -r
-      register: kernel_running
+      register: kernel
       changed_when: false
 
     - name: Get Ubuntu codename
@@ -143,14 +143,14 @@ crack_armor
       register: codename
       changed_when: false
 
-    - name: Get sudo version safely
-      command: dpkg -l sudo | awk '/^ii/ {print $3}' || echo "unknown"
+    - name: Get sudo version (safe method)
+      command: dpkg -l sudo | tail -n 1 | awk '{print $3}'
       register: sudo_ver
       changed_when: false
       ignore_errors: true
 
-    - name: Get util-linux version safely
-      command: dpkg -l util-linux | awk '/^ii/ {print $3}' || echo "unknown"
+    - name: Get util-linux version (safe method)
+      command: dpkg -l util-linux | tail -n 1 | awk '{print $3}'
       register: util_ver
       changed_when: false
       ignore_errors: true
@@ -159,33 +159,30 @@ crack_armor
       vars:
         host: "{{ inventory_hostname }}"
         ubuntu: "{{ codename.stdout | default('unknown') | trim }}"
-        kernel: "{{ kernel_running.stdout | trim }}"
-        sudo_v: "{{ sudo_ver.stdout | trim }}"
-        util_v: "{{ util_ver.stdout | trim }}"
+        kern: "{{ kernel.stdout | trim }}"
+        sudo_v: "{{ sudo_ver.stdout | default('unknown') | trim }}"
+        util_v: "{{ util_ver.stdout | default('unknown') | trim }}"
       debug:
         msg: |
           ================================================
-          Host                  : {{ host }}
-          Ubuntu                : {{ ubuntu }}
-          Running Kernel        : {{ kernel }}     ← MOST IMPORTANT
+          Host             : {{ host }}
+          Ubuntu           : {{ ubuntu }}
+          Running Kernel   : {{ kern }}     ← MOST IMPORTANT
 
-          sudo version          : {{ sudo_v }}
-          util-linux version    : {{ util_v }}
+          sudo version     : {{ sudo_v }}
+          util-linux       : {{ util_v }}
 
           STATUS:
-          Userspace fixes (sudo + util-linux) are PATCHED.
-
-          For Ubuntu 22.04 AWS:
-          Fixed kernel = 6.8.0-1050.53~22.04.1  (or 5.15.0-1103.110)
-
-          {% if kernel is search('6.8.0-1050') %}
-          → This server is **PATCHED / SAFE**
+          {% if kern is search('6.8.0-1050') or kern is search('5.15.0-1103') %}
+          → **PATCHED / SAFE** against CrackArmor
           {% else %}
-          → This server is likely **VULNERABLE** — run:
-            sudo apt update && sudo apt install --only-upgrade linux-aws linux-image-aws
+          → **VULNERABLE** — Update now:
+            sudo apt update
+            sudo apt install --only-upgrade linux-aws linux-image-aws
             sudo reboot
           {% endif %}
 
-          Always double-check exact version here:
+          Official reference:
           https://ubuntu.com/security/vulnerabilities/crackarmor
+          (Look for Jammy 22.04 → linux-aws-6.8)
           ================================================
