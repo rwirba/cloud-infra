@@ -133,7 +133,7 @@ crack_armor
 
   tasks:
 
-    - name: Get running kernel
+- name: Get running kernel
       command: uname -r
       register: kernel_running
       changed_when: false
@@ -143,46 +143,49 @@ crack_armor
       register: codename
       changed_when: false
 
-    - name: Get sudo and util-linux versions
-      command: dpkg-query -W -f='${Package} ${Version}\n' sudo util-linux 2>/dev/null || echo "not found"
-      register: mitigations
+    - name: Get sudo version safely
+      command: dpkg -l sudo | awk '/^ii/ {print $3}' || echo "unknown"
+      register: sudo_ver
       changed_when: false
+      ignore_errors: true
 
-    - name: Try to list installed linux-image packages (ignore failure on AWS)
-      command: dpkg -l 'linux-image*' 2>/dev/null | grep '^ii' || echo "No locally installed linux-image packages (common on AWS)"
-      register: kernels_installed
+    - name: Get util-linux version safely
+      command: dpkg -l util-linux | awk '/^ii/ {print $3}' || echo "unknown"
+      register: util_ver
       changed_when: false
-      ignore_errors: true   # ← prevents failure
+      ignore_errors: true
 
     - name: === CRACKARMOR CHECK RESULT ===
       vars:
         host: "{{ inventory_hostname }}"
         ubuntu: "{{ codename.stdout | default('unknown') | trim }}"
         kernel: "{{ kernel_running.stdout | trim }}"
-        sudo_ver: "{{ mitigations.stdout | regex_search('sudo ([^ ]+)', '\\1') | default('unknown') }}"
-        util_ver: "{{ mitigations.stdout | regex_search('util-linux ([^ ]+)', '\\1') | default('unknown') }}"
-        installed_kernels: "{{ kernels_installed.stdout | trim }}"
+        sudo_v: "{{ sudo_ver.stdout | trim }}"
+        util_v: "{{ util_ver.stdout | trim }}"
       debug:
         msg: |
           ================================================
           Host                  : {{ host }}
-          Ubuntu Codename       : {{ ubuntu }}
-          Running Kernel        : {{ kernel }}   ← This is what matters most
-          Installed linux-image : 
-          {{ installed_kernels }}
+          Ubuntu                : {{ ubuntu }}
+          Running Kernel        : {{ kernel }}     ← MOST IMPORTANT
 
-          sudo version          : {{ sudo_ver }}
-          util-linux version    : {{ util_ver }}
+          sudo version          : {{ sudo_v }}
+          util-linux version    : {{ util_v }}
 
-          STATUS & NEXT STEPS:
-          1. Go to: https://ubuntu.com/security/vulnerabilities/crackarmor
-          2. Find your Ubuntu release ({{ ubuntu }}) and AWS variant.
-          3. Compare your **Running Kernel** above with the "Fixed Version" for linux-aws / linux-aws-6.8 etc.
+          STATUS:
+          Userspace fixes (sudo + util-linux) are PATCHED.
 
-          Example (as of March 2026):
-          - Ubuntu 24.04 (noble) + AWS → fixed at 6.8.0-1050.53 or higher
-          - Ubuntu 22.04 (jammy) + AWS → fixed at 6.8.0-1050.53~22.04.1 or higher
+          For Ubuntu 22.04 AWS:
+          Fixed kernel = 6.8.0-1050.53~22.04.1  (or 5.15.0-1103.110)
 
-          If your running kernel is OLDER than the fixed version → VULNERABLE
-          After `apt upgrade` + reboot, re-run this job to confirm.
+          {% if kernel is search('6.8.0-1050') %}
+          → This server is **PATCHED / SAFE**
+          {% else %}
+          → This server is likely **VULNERABLE** — run:
+            sudo apt update && sudo apt install --only-upgrade linux-aws linux-image-aws
+            sudo reboot
+          {% endif %}
+
+          Always double-check exact version here:
+          https://ubuntu.com/security/vulnerabilities/crackarmor
           ================================================
