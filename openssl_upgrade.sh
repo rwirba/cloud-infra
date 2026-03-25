@@ -186,3 +186,24 @@ crack_armor
           https://ubuntu.com/security/vulnerabilities/crackarmor
           (Look for Jammy 22.04 → linux-aws-6.8)
           ================================================
+
+
+
+
+          All three servers are Ubuntu 22.04 (jammy) on AWS.
+
+sudo is 1.9.9-1ubuntu2.6 → patched for CrackArmor
+util-linux is 2.37.2-4ubuntu3.5 → patched
+(sudo 1.9.9-1ubuntu2.6 and util-linux 2.37.2-4ubuntu3.5 are the exact fixed versions for 22.04)
+Kernel status (most important part):
+
+server01: 6.8.0-1044-aws → VULNERABLE (older than the fixed version)
+server02 & server03: 6.8.0-1050-aws → PATCHED / SAFE
+
+Official fixed versions for Ubuntu 22.04 AWS (as of March 25, 2026):
+
+linux-aws-6.8 → 6.8.0-1050.53~22.04.1 (this is the CrackArmor patch)
+Older linux-aws (5.15 series) → 5.15.0-1103.110
+6.8.0-1044-aws → still VULNERABLE (needs update)
+
+Your 1050-aws kernels are very close — the patch landed around March 17–20, 2026. Servers on 1050 are safe; 1044 needs updating.
