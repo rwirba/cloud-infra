@@ -122,3 +122,68 @@ log "  - If issues: restore from backup with 'sudo tar -xzf ${BACKUP_FILE} -C /'
 log "  - To make openssl easier: add 'export PATH=\"${PREFIX}/bin:\$PATH\"' to /etc/profile.d/"
 
 exit 0
+
+###############################################################################################################
+crack_armor
+
+---
+- name: CrackArmor Vulnerability Check (AAP-friendly - console output only)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+
+    - name: Gather package facts
+      package_facts:
+        manager: apt
+
+    - name: Get running kernel
+      command: uname -r
+      register: kernel_running
+      changed_when: false
+
+    - name: Get installed kernel packages
+      command: dpkg -l 'linux-image*' | grep '^ii' || echo "No linux-image packages found"
+      register: kernels_installed
+      changed_when: false
+
+    - name: Get mitigation packages (sudo and util-linux)
+      command: dpkg-query -W -f='${Package} ${Version}\n' sudo util-linux 2>/dev/null || echo "Packages not found"
+      register: mitigations
+      changed_when: false
+
+    - name: Get Ubuntu codename
+      command: lsb_release -cs
+      register: codename
+      changed_when: false
+
+    - name: === CRACKARMOR VULNERABILITY CHECK RESULT ===
+      vars:
+        host: "{{ inventory_hostname }}"
+        ubuntu: "{{ codename.stdout | default('unknown') | trim }}"
+        kernel: "{{ kernel_running.stdout | trim }}"
+        sudo_ver: "{{ mitigations.stdout | regex_search('sudo ([^ ]+)', '\\1') | default('unknown') }}"
+        util_ver: "{{ mitigations.stdout | regex_search('util-linux ([^ ]+)', '\\1') | default('unknown') }}"
+        installed: "{{ kernels_installed.stdout | trim }}"
+      debug:
+        msg: |
+          ================================================
+          Host                  : {{ host }}
+          Ubuntu Release        : {{ ubuntu }}
+          Running Kernel        : {{ kernel }}
+          Installed Kernels     : 
+          {{ installed }}
+          
+          sudo version          : {{ sudo_ver }}
+          util-linux version    : {{ util_ver }}
+          
+          RECOMMENDATION:
+          Compare the **Running Kernel** above with the official fixed versions at:
+          https://ubuntu.com/security/vulnerabilities/crackarmor
+          
+          If your running kernel is older than the fixed version for your release/variant,
+          your server is **VULNERABLE**.
+          
+          After patching and rebooting, re-run this job to confirm.
+          ================================================
