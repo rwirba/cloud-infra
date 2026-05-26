@@ -1,0 +1,97 @@
+PROFESSIONAL SUMMARY
+Senior DevOps Engineer with 8+ years of experience architecting and scaling cloud-native platforms, CI/CD ecosystems and
+resilient distributed systems across AWS, Azure and GCP.
+Expert in Kubernetes platform engineering, Infrastructure as Code (Terraform) and GitOps-driven delivery models, with a
+strong focus on system reliability, cloud security and automation at scale. Proven track record of reducing deployment risk,
+improving MTTR and optimizing cloud spend in enterprise and regulated environments.
+Known for bridging development, operations and security teams to build highly available, secure and performance-
+optimized systems aligned with modern DevSecOps and SRE practices.
+SKILLS
+Cloud Platforms & Services: AWS (EC2, EKS, ECS, Lambda, S3, RDS, DynamoDB, VPC, IAM, CloudFront, Route 53, SQS, SNS,
+KMS, CloudWatch, CloudTrail), Azure (VMs, AKS, Azure DevOps), GCP (Compute Engine, GKE, Cloud Storage), OpenStack
+DevOps & CI/CD Tooling: Jenkins, GitHub Actions, GitLab CI/CD, CircleCI, AWS CodePipeline, ArgoCD (GitOps), Bitbucket
+Pipelines, Maven, Gradle, Nexus, SonarQube
+Infrastructure as Code & Automation: Terraform (Modules, Workspaces), AWS CloudFormation, Ansible, Puppet, Chef,
+Packer, Bash Scripting, Python Automation
+Containers & Orchestration: Docker, Kubernetes (EKS, AKS, GKE), Helm, Kustomize, Container Registry (ECR, Docker Hub),
+Autoscaling (HPA), Service Mesh (Istio – exposure level)
+Monitoring, Logging & Observability: Prometheus, Grafana, Datadog, ELK Stack (Elasticsearch, Logstash, Kibana), Splunk,
+New Relic, Dynatrace, AWS CloudWatch, X-Ray
+Security, Networking & Compliance: IAM, RBAC, AWS Security Hub, AWS Config, GuardDuty, Amazon Inspector, KMS
+Encryption, TLS/SSL, VPC, Subnets, NAT Gateway, Transit Gateway, DNS, Zero Trust, Vulnerability Management
+Programming, Systems & Databases: Python, Bash, PowerShell, YAML, Groovy, Java, SQL, Linux (RHEL/Ubuntu),
+PostgreSQL, MySQL, MongoDB, Redis, RabbitMQ
+PROFESSIONAL EXPERIENCE
+Cloud/DevOps Engineer
+CDW Jul 2023 – Present
+ Architected and standardized multi-account, multi-region cloud environments using Terraform and
+CloudFormation, enabling consistent infrastructure provisioning and reducing environment setup time by 45%
+across dev, staging and production
+ Designed and implemented end-to-end CI/CD pipelines with Jenkins and GitHub Actions, incorporating automated
+testing, security scanning and approval gates, increasing deployment frequency while reducing release failures by
+50%
+ Built and managed enterprise-grade Kubernetes platforms (EKS/AKS) with Helm-based deployments, autoscaling
+policies (HPA) and namespace isolation, improving application scalability and cluster utilization by 30%
+ Developed reusable Terraform modules and infrastructure blueprints, allowing teams to self-serve infrastructure
+while enforcing governance and security controls
+ Implemented DevSecOps practices by integrating SAST, DAST and container image scanning into pipelines,
+significantly improving vulnerability detection and reducing security risks pre-production
+ Engineered disaster recovery and high-availability architectures, leveraging cross-region replication, automated
+backups and failover strategies to meet strict RTO/RPO objectives
+ Automated operational workflows using Python and Bash scripting, eliminating over 80% of manual infrastructure
+tasks and improving operational efficiency
+ Partnered with security and compliance teams to enforce Zero Trust architecture, including IAM least privilege,
+encryption (KMS) and network segmentation
+DevOps Engineer
+Intel Mar 2021 – Mar 2023
+ Engineered and maintained Kubernetes-based microservices platforms, supporting high-throughput applications
+with 99.99% availability and fault tolerance
+ Designed and implemented scalable CI/CD frameworks, reducing deployment lead time by 40% while ensuring
+consistency across environments
+ Automated infrastructure provisioning across multi-region AWS environments, enabling high availability and
+reducing manual configuration drift
+ Built and deployed observability frameworks using Prometheus, Grafana and CloudWatch, enabling proactive
+monitoring and reducing MTTR by 35%
+ Strengthened cloud security posture by implementing IAM role-based access, AWS Security Hub and vulnerability
+scanning, reducing security incidents by 25%
+ Optimized compute and storage costs through autoscaling, rightsizing and performance tuning, achieving a 20%
+reduction in cloud spend
+ Containerized legacy and modern applications using Docker and Kubernetes, improving deployment consistency
+and rollback efficiency
+ Collaborated with engineering teams to adopt Infrastructure as Code and GitOps workflows, improving deployment
+traceability and auditability
+DevOps Engineer
+Wells Fargo Jul 2019 – Mar 2021
+ Led large-scale cloud migration initiatives from on-prem to AWS, improving application performance by 15% and
+reducing infrastructure costs by 25%
+ Designed secure networking architectures using VPC, Transit Gateway and NAT Gateway, ensuring highly available
+and isolated environments
+ Built and optimized CI/CD pipelines using Jenkins and GitLab CI, reducing deployment failures by 20% through
+automated testing and validation
+ Implemented centralized logging and monitoring using Splunk, CloudTrail and CloudWatch, improving system
+observability and audit readiness
+ Conducted security audits and compliance checks using AWS Config and Inspector, ensuring adherence to regulatory
+standards
+ Collaborated with development and QA teams to streamline release processes, reducing production issues by 18%
+ Supported infrastructure scaling and performance tuning efforts, improving system stability under high load
+conditions
+Site Reliability Engineer (SRE)
+Deloitte Feb 2017 – Feb 2019
+ Designed and operated highly available distributed systems on AWS, ensuring minimal downtime and optimal
+system performance
+ Implemented SRE best practices (SLIs, SLOs, error budgets) to improve reliability and enforce service-level
+objectives
+ Automated infrastructure provisioning using Terraform, reducing environment setup time by 50% and improving
+consistency
+ Built advanced monitoring and alerting systems using Datadog and New Relic, reducing incident detection and
+response time
+ Led incident response efforts, conducted root cause analysis (RCA) and implemented corrective actions, reducing
+recurring outages by 30%
+ Optimized system performance through capacity planning, load balancing and resource tuning, ensuring scalability
+ Supported Kubernetes adoption for microservices, improving deployment speed and system resilience
+EDUCATION
+Bachelor of Science in Computer Science
+University of Bamenda Dec 2010 – Sep 2013
+CERTIFICATIONS
+ AWS Certified DevOps Engineer – Professional
+ AWS Certified Solutions Architect – Professional
