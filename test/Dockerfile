@@ -12,8 +12,10 @@ gpgcheck=1
 gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
 EOF
 RUN microdnf install -y temurin-22-jdk &&  \
-    rm -rf /usr/lib/jvm/temurin-22-jdk && \
     microdnf clean all
+ENV JAVA_HOME=/usr/lib/jvm/temurin-22-jdk
+ENV PATH="$JAVA_HOME/bin:$PATH"
+RUN chown -R appuser:appuser /usr/lib/jvm
 
 
 WORKDIR /tmp
