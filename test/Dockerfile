@@ -1,50 +1,45 @@
-FROM confluentinc/cp-kafka-connect:8.2.1
-USER root
+---
+- name: Populate service facts
+  ansible.builtin.service_facts:
 
-# --- Remove vulnerable Netty + Jetty JARs ---
-USER root
-RUN cat <<EOF > /etc/yum.repos.d/adoptium.repo
-[Adoptium]
-name=Adoptium
-baseurl=https://packages.adoptium.net/artifactory/rpm/${DISTRIBUTION_NAME:-$(. /etc/os-release; echo $ID)}/\$releasever/\$basearch
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
-EOF
-RUN microdnf install -y temurin-22-jdk &&  \
-    microdnf clean all
-ENV JAVA_HOME=/usr/lib/jvm/temurin-22-jdk
-ENV PATH="$JAVA_HOME/bin:$PATH"
-RUN chown -R appuser:appuser /usr/lib/jvm
+- name: Extract installed Splunk version
+  ansible.builtin.command: "{{ splunk_home }}/bin/splunk version"
+  register: splunk_version_output
+  failed_when: false
+  changed_when: false
+  when: "'splunk' in ansible_facts.packages"
 
+- name: Set installed version fact
+  ansible.builtin.set_fact:
+    splunk_installed_version: "{{ splunk_version_output.stdout | regex_search('(\\d+\\.\\d+\\.\\d+)', '\\1') | first | default('0.0.0') }}"
+  when: splunk_version_output.stdout is defined
 
-WORKDIR /tmp
+- name: Download Splunk Universal Forwarder from Nexus
+  ansible.builtin.get_url:
+    url: "{{ nexus_url }}"
+    dest: "/tmp/{{ file_name }}"
+    mode: '0755'
+  register: downloaded_file
 
-RUN rm -f \
-    /usr/share/java/kafka-serde-tools/netty-codec-http2-4.1.130.Final.jar \
-    /usr/share/java/kafka-serde-tools/netty-codec-http-4.1.130.Final.jar \
-    /usr/share/java/kafka-serde-tools/netty-codec-dns-4.1.130.Final.jar \
-    /usr/share/java/kafka-serde-tools/netty-codec-4.1.130.Final.jar \
-    /usr/share/java/rest-utils/jetty-server-12.0.25.jar \
-    /usr/share/java/rest-utils/jetty-http-12.0.25.jar
+- name: Extract version from downloaded package
+  ansible.builtin.command: "dpkg-deb --showformat='${Version}' -W /tmp/{{ file_name }}"
+  register: latest_version_output
+  changed_when: false
 
-# --- Add fixed Netty 4.1.133.Final ---
-RUN curl -L -o /usr/share/java/kafka-serde-tools/netty-codec-http2-4.1.133.Final.jar \
-        https://repo1.maven.org/maven2/io/netty/netty-codec-http2/4.1.133.Final/netty-codec-http2-4.1.133.Final.jar && \
-    curl -L -o /usr/share/java/kafka-serde-tools/netty-codec-http-4.1.133.Final.jar \
-        https://repo1.maven.org/maven2/io/netty/netty-codec-http/4.1.133.Final/netty-codec-http-4.1.133.Final.jar && \
-    curl -L -o /usr/share/java/kafka-serde-tools/netty-codec-dns-4.1.133.Final.jar \
-        https://repo1.maven.org/maven2/io/netty/netty-codec-dns/4.1.133.Final/netty-codec-dns-4.1.133.Final.jar && \
-    curl -L -o /usr/share/java/kafka-serde-tools/netty-codec-4.1.133.Final.jar \
-        https://repo1.maven.org/maven2/io/netty/netty-codec/4.1.133.Final/netty-codec-4.1.133.Final.jar
+- name: Set latest version fact
+  ansible.builtin.set_fact:
+    latest_splunk_version: "{{ latest_version_output.stdout | trim | default('0.0.0') }}"
 
-# --- Add fixed Jetty ---
-RUN curl -L -o /usr/share/java/rest-utils/jetty-server-12.0.32.jar \
-        https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-server/12.0.32/jetty-server-12.0.32.jar && \
-    curl -L -o /usr/share/java/rest-utils/jetty-http-12.0.33.jar \
-        https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-http/12.0.33/jetty-http-12.0.33.jar
+- name: Debug versions
+  ansible.builtin.debug:
+    msg: |
+      Installed version: {{ splunk_installed_version | default('Not installed') }}
+      Latest version in Nexus: {{ latest_splunk_version }}
 
-# Fix permissions for runtime user
-
-RUN chown -R appuser:appuser /usr/share/java
-USER nobody
+- name: Install/Upgrade Splunk Universal Forwarder
+  ansible.builtin.apt:
+    deb: "/tmp/{{ file_name }}"
+    state: present
+  when: >
+    splunk_installed_version is not defined or
+    latest_splunk_version is version(splunk_installed_version, '>')
