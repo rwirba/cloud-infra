@@ -2,3 +2,10 @@ fields userIdentity.type, userIdentity.arn, eventSource, awsRegion, eventName, e
 | filter userAgent like /aws-sdk-java\/1\./
 | filter userAgent not like /aws-internal\//
 | sort eventTime desc
+
+
+
+SELECT eventTime, eventSource, eventName, userAgent, sourceIPAddress, userIdentity.arn
+FROM $EDS
+WHERE userAgent LIKE '%aws-sdk-java%'
+ORDER BY eventTime DESC
