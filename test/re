@@ -9,3 +9,10 @@ SELECT eventTime, eventSource, eventName, userAgent, sourceIPAddress, userIdenti
 FROM $EDS
 WHERE userAgent LIKE '%aws-sdk-java%'
 ORDER BY eventTime DESC
+
+
+Reviewed AWS Health advisory regarding AWS SDK for Java 1.x end-of-support.
+
+AWS has reported SDK Java 1.x usage within the account during the last 16 days. Investigation has been initiated to identify the originating application(s), including review of CloudTrail activity, Kubernetes/Rancher workloads, Windows-hosted applications, and associated AWS integrations.
+
+No customer impact has been identified. Further updates will be provided once the affected application(s) and owners have been confirmed.
