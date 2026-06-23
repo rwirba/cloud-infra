@@ -1,18 +1,7 @@
-fields userIdentity.type, userIdentity.arn, eventSource, awsRegion, eventName, eventTime, userAgent, sourceIPAddress
-| filter userAgent like /aws-sdk-java\/1\./
-| filter userAgent not like /aws-internal\//
-| sort eventTime desc
-
-
-
-SELECT eventTime, eventSource, eventName, userAgent, sourceIPAddress, userIdentity.arn
-FROM $EDS
-WHERE userAgent LIKE '%aws-sdk-java%'
-ORDER BY eventTime DESC
-
-
-Reviewed AWS Health advisory regarding AWS SDK for Java 1.x end-of-support.
-
-AWS has reported SDK Java 1.x usage within the account during the last 16 days. Investigation has been initiated to identify the originating application(s), including review of CloudTrail activity, Kubernetes/Rancher workloads, Windows-hosted applications, and associated AWS integrations.
-
-No customer impact has been identified. Further updates will be provided once the affected application(s) and owners have been confirmed.
+How to Safely Delete Nexus Artifacts via Command LineThis guide provides standard operating procedures for securely deleting artifacts from Sonatype Nexus using the command line. Passing plain-text passwords directly into commands exposes credentials to shell history files and process listings. Use one of the two secure methods below instead.Prerequisitescurl installed on your local machine.Target Component ID (for Nexus 3) or File Path (for Nexus 2).Appropriate Privileges: Your Nexus account must have nx-repository-view-*-*-delete permissions.Method 1: Prompting for Password (Interactive)This method prevents your password from being saved to your shell history. When you omit the password, curl securely prompts you for it and masks your input.For Nexus 3 (Component Delete)Find the Component ID: Run the search query. Leave the trailing colon : after your username to trigger the password prompt.bashcurl -u "your_username:" -X GET "http://<NEXUS_URL>:<PORT>/service/rest/v1/search?repository=<REPO_NAME>&maven.groupId=<GROUP_ID>&maven.artifactId=<ARTIFACT_ID>&maven.baseVersion=<VERSION>"
+Use code with caution.Input Password: Type your password when prompted and press Enter.Copy the ID: Locate the "id" string inside the returned JSON response.Execute Deletion: Run the delete command using the component ID, again leaving the trailing colon:bashcurl -u "your_username:" -X DELETE "http://<NEXUS_URL>:<PORT>/service/rest/v1/components/<COMPONENT_ID>"
+Use code with caution.For Nexus 2 (Direct Path Delete)Run the DELETE request against the asset path. Provide your username followed by a colon:bashcurl --request DELETE -u "your_username:" "http://<NEXUS_URL>:<PORT>/nexus/service/local/repositories/<REPO_NAME>/content/<GROUP_ID_PATH>/<ARTIFACT_ID>/<VERSION>/"
+Use code with caution.Method 2: Using a Nexus User Token (Non-Interactive / Automation)User Tokens allow you to authenticate without exposing your primary account password. If a token is compromised, it can be individually revoked without forcing a global password reset.Step 1: Generate Your User TokenLog into the Nexus Repository Manager GUI.Click on your username in the top-right corner to open your profile.Select User Token from the left-hand menu.Click Access User Token.Copy the Token Name and Token Code provided.Step 2: Format the Token for AuthorizationNexus requires User Tokens to be sent as a base64-encoded string via the HTTP Authorization header. You can encode your token directly in the terminal:bash# Combine Name and Code with a colon, then encode it
+echo -n "token_name:token_code" | base64
+Use code with caution.Example output: ZE9rM25OYW1lOnRva2VuQ29kZVN0cmluZw==Step 3: Execute Deletion with the Token HeaderReplace <BASE64_TOKEN> with the string generated in Step 2.For Nexus 3 Component Deletion:bashcurl -H "Authorization: Basic <BASE64_TOKEN>" -X DELETE "http://<NEXUS_URL>:<PORT>/service/rest/v1/components/<COMPONENT_ID>"
+Use code with caution.For Nexus 2 Path Deletion:bashcurl --request DELETE -H "Authorization: Basic <BASE64_TOKEN>" "http://<NEXUS_URL>:<PORT>/nexus/service/local/repositories/<REPO_NAME>/content/<GROUP_ID_PATH>/<ARTIFACT_ID>/<VERSION>/"
