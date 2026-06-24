@@ -1,26 +1,195 @@
-# Safely Deleting Nexus Artifacts via Command Line
+# Nexus Artifact Deletion Guide
 
-This guide provides standard operating procedures for securely deleting artifacts from Sonatype Nexus using the command line.
+## Overview
 
-> **Security Notice**
->
-> Passing plain-text passwords directly in command-line arguments exposes credentials through:
->
-> * Shell history files (`~/.bash_history`)
-> * Process listings (`ps`, `top`)
-> * Audit logs
->
-> Use one of the secure authentication methods described below instead.
+This guide explains how to safely delete artifacts from Sonatype Nexus using the command line. It covers common artifact types such as Docker images, Maven/build artifacts, and raw files.
 
----
+Use this process when cleaning up old, duplicate, failed, or unused artifacts from Nexus repositories.
 
-# Prerequisites
+## Important Notes
 
-Before proceeding, ensure you have:
+Deleting artifacts from Nexus is permanent unless backups or retention policies are available.
 
-* `curl` installed on your local machine
-* The target Component ID (Nexus 3) or file path (Nexus 2)
-* A Nexus account with appropriate delete permissions
+Before deleting anything:
+
+* Confirm the repository name.
+* Confirm the artifact name, tag, version, or file path.
+* Confirm the artifact is no longer required by any deployment, pipeline, or release process.
+* Use a service account or user account with delete permissions.
+* Avoid passing passwords directly in commands.
+
+Required Nexus permission:
+
+```text
+nx-repository-view-*-*-delete
+```
+
+## Authentication
+
+Use `curl` with a username and password prompt instead of putting the password directly in the command.
+
+```bash
+curl -u "USERNAME:" <NEXUS_API_URL>
+```
+
+Nexus will prompt for the password securely.
+
+## Nexus 3: Find and Delete a Component
+
+Most artifact deletions in Nexus 3 require the component ID.
+
+### Step 1: Search for the Artifact
+
+```bash
+curl -u "USERNAME:" -X GET \
+"http://NEXUS_URL:8081/service/rest/v1/search?repository=REPOSITORY_NAME&name=ARTIFACT_NAME"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X GET \
+"http://nexus.example.com:8081/service/rest/v1/search?repository=maven-releases&name=my-app"
+```
+
+From the response, copy the component `id`.
+
+### Step 2: Delete the Component
+
+```bash
+curl -u "USERNAME:" -X DELETE \
+"http://NEXUS_URL:8081/service/rest/v1/components/COMPONENT_ID"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X DELETE \
+"http://nexus.example.com:8081/service/rest/v1/components/abc123def456"
+```
+
+A successful delete normally returns no output.
+
+## Delete Maven or Build Artifacts
+
+Use this for `.jar`, `.war`, `.ear`, `.zip`, or other build artifacts stored in Maven repositories.
+
+### Search by Group ID, Artifact ID, and Version
+
+```bash
+curl -u "USERNAME:" -X GET \
+"http://NEXUS_URL:8081/service/rest/v1/search?repository=REPOSITORY_NAME&maven.groupId=GROUP_ID&maven.artifactId=ARTIFACT_ID&maven.baseVersion=VERSION"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X GET \
+"http://nexus.example.com:8081/service/rest/v1/search?repository=maven-releases&maven.groupId=com.company.app&maven.artifactId=my-app&maven.baseVersion=1.0.0"
+```
+
+Delete using the returned component ID:
+
+```bash
+curl -u "USERNAME:" -X DELETE \
+"http://NEXUS_URL:8081/service/rest/v1/components/COMPONENT_ID"
+```
+
+## Delete Docker Images
+
+Docker images in Nexus are also deleted by component ID.
+
+### Search for Docker Image
+
+```bash
+curl -u "USERNAME:" -X GET \
+"http://NEXUS_URL:8081/service/rest/v1/search?repository=DOCKER_REPOSITORY_NAME&name=IMAGE_NAME&version=IMAGE_TAG"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X GET \
+"http://nexus.example.com:8081/service/rest/v1/search?repository=docker-hosted&name=my-app&version=1.0.0"
+```
+
+Delete the returned component ID:
+
+```bash
+curl -u "USERNAME:" -X DELETE \
+"http://NEXUS_URL:8081/service/rest/v1/components/COMPONENT_ID"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X DELETE \
+"http://nexus.example.com:8081/service/rest/v1/components/abc123def456"
+```
+
+## Delete Raw Files
+
+For raw repositories, search by repository and file name/path.
+
+### Search for Raw File
+
+```bash
+curl -u "USERNAME:" -X GET \
+"http://NEXUS_URL:8081/service/rest/v1/search?repository=RAW_REPOSITORY_NAME&name=FILE_NAME"
+```
+
+Example:
+
+```bash
+curl -u "admin:" -X GET \
+"http://nexus.example.com:8081/service/rest/v1/search?repository=raw-hosted&name=config.zip"
+```
+
+Delete the component:
+
+```bash
+curl -u "USERNAME:" -X DELETE \
+"http://NEXUS_URL:8081/service/rest/v1/components/COMPONENT_ID"
+```
+
+## Verify Deletion
+
+After deleting, run the search command again to confirm the artifact no longer exists.
+
+```bash
+curl -u "USERNAME:" -X GET \
+"http://NEXUS_URL:8081/service/rest/v1/search?repository=REPOSITORY_NAME&name=ARTIFACT_NAME"
+```
+
+If the artifact is deleted, it should no longer appear in the search results.
+
+## Recommended Safe Deletion Process
+
+1. Search for the artifact.
+2. Confirm the repository, name, version, and component ID.
+3. Validate with the application or release owner.
+4. Delete the component.
+5. Re-run the search to confirm deletion.
+6. Document the deletion in the change ticket or Confluence page.
+
+## Example Deletion Record
+
+```text
+Repository: maven-releases
+Artifact: my-app
+Version/Tag: 1.0.0
+Component ID: abc123def456
+Deleted By: USERNAME
+Date: YYYY-MM-DD
+Reason: Old unused artifact cleanup
+Validation: Confirmed artifact no longer appears in Nexus search results
+```
+
+## Troubleshooting
+
+### 403 Forbidden
+
+The user does not have permission to delete artifacts.
 
 Required permission:
 
@@ -28,238 +197,19 @@ Required permission:
 nx-repository-view-*-*-delete
 ```
 
----
-
-# Method 1: Interactive Password Prompt (Recommended for Manual Use)
-
-This method prevents your password from being stored in shell history.
-
-By specifying only the username followed by a colon (`:`), `curl` prompts securely for the password.
-
----
-
-## Nexus 3 – Delete by Component ID
-
-### Step 1: Find the Component ID
-
-Run the search query below:
-
-```bash
-curl -u "your_username:" \
--X GET \
-"http://<NEXUS_URL>:<PORT>/service/rest/v1/search?repository=<REPO_NAME>&maven.groupId=<GROUP_ID>&maven.artifactId=<ARTIFACT_ID>&maven.baseVersion=<VERSION>"
-```
-
-You will be prompted to enter your password securely.
-
-### Step 2: Locate the Component ID
-
-In the JSON response, locate the `"id"` field.
-
-Example:
-
-```json
-{
-  "id": "Y29tcG9uZW50OjEyMzQ1"
-}
-```
-
-Copy the value of the ID.
-
-### Step 3: Delete the Component
-
-```bash
-curl -u "your_username:" \
--X DELETE \
-"http://<NEXUS_URL>:<PORT>/service/rest/v1/components/<COMPONENT_ID>"
-```
-
-Example:
-
-```bash
-curl -u "jdoe:" \
--X DELETE \
-"http://nexus.company.com:8081/service/rest/v1/components/Y29tcG9uZW50OjEyMzQ1"
-```
-
----
-
-## Nexus 2 – Delete by Repository Path
-
-Delete artifacts directly using the repository path:
-
-```bash
-curl --request DELETE \
--u "your_username:" \
-"http://<NEXUS_URL>:<PORT>/nexus/service/local/repositories/<REPO_NAME>/content/<GROUP_ID_PATH>/<ARTIFACT_ID>/<VERSION>/"
-```
-
-Example:
-
-```bash
-curl --request DELETE \
--u "jdoe:" \
-"http://nexus.company.com:8081/nexus/service/local/repositories/releases/content/com/company/app/my-app/1.0.0/"
-```
-
----
-
-# Method 2: Nexus User Token (Recommended for Automation)
-
-For scripts, CI/CD pipelines, and automation, use a Nexus User Token instead of your account password.
-
-Benefits:
-
-* No need to expose primary account credentials
-* Can be revoked independently
-* Ideal for Jenkins, GitHub Actions, GitLab CI, and other automation platforms
-
----
-
-## Step 1: Generate a User Token
-
-1. Log in to Nexus Repository Manager.
-2. Click your username in the upper-right corner.
-3. Open **User Token**.
-4. Click **Access User Token**.
-5. Copy the following values:
-
-   * Token Name
-   * Token Code
-
----
-
-## Step 2: Encode the Token
-
-Combine the Token Name and Token Code separated by a colon and Base64 encode them.
-
-```bash
-echo -n "token_name:token_code" | base64
-```
-
-Example:
-
-```bash
-echo -n "john.token:AbCdEf123456" | base64
-```
-
-Output:
-
-```text
-ZE9rM25OYW1lOnRva2VuQ29kZVN0cmluZw==
-```
-
-Copy the generated Base64 string.
-
----
-
-## Step 3: Delete Using the Authorization Header
-
-Replace `<BASE64_TOKEN>` with the encoded value.
-
----
-
-### Nexus 3 – Component Deletion
-
-```bash
-curl \
--H "Authorization: Basic <BASE64_TOKEN>" \
--X DELETE \
-"http://<NEXUS_URL>:<PORT>/service/rest/v1/components/<COMPONENT_ID>"
-```
-
-Example:
-
-```bash
-curl \
--H "Authorization: Basic ZE9rM25OYW1lOnRva2VuQ29kZVN0cmluZw==" \
--X DELETE \
-"http://nexus.company.com:8081/service/rest/v1/components/Y29tcG9uZW50OjEyMzQ1"
-```
-
----
-
-### Nexus 2 – Path Deletion
-
-```bash
-curl \
---request DELETE \
--H "Authorization: Basic <BASE64_TOKEN>" \
-"http://<NEXUS_URL>:<PORT>/nexus/service/local/repositories/<REPO_NAME>/content/<GROUP_ID_PATH>/<ARTIFACT_ID>/<VERSION>/"
-```
-
-Example:
-
-```bash
-curl \
---request DELETE \
--H "Authorization: Basic ZE9rM25OYW1lOnRva2VuQ29kZVN0cmluZw==" \
-"http://nexus.company.com:8081/nexus/service/local/repositories/releases/content/com/company/app/my-app/1.0.0/"
-```
-
----
-
-# Best Practices
-
-✅ Use User Tokens for automation.
-
-✅ Use interactive password prompts for manual operations.
-
-✅ Verify the component ID before deleting.
-
-✅ Restrict delete permissions to authorized users.
-
-✅ Test commands in a non-production environment first.
-
-❌ Do not hardcode passwords in scripts.
-
-❌ Do not store passwords in shell history.
-
-❌ Do not grant delete permissions broadly.
-
----
-
-# Troubleshooting
-
-### 401 Unauthorized
-
-Verify:
-
-* Username/password or token is correct
-* Account is active
-* User token has not been revoked
-
-### 403 Forbidden
-
-Verify the account has:
-
-```text
-nx-repository-view-*-*-delete
-```
-
-permissions.
-
 ### 404 Not Found
 
-Verify:
+The component ID may be incorrect or the artifact may have already been deleted.
 
-* Repository name is correct
-* Component ID exists
-* Artifact path is accurate
+### Artifact Still Appears After Delete
 
-### Nexus 3 Search Returns No Results
+Wait a few minutes and refresh the Nexus UI. Also confirm you deleted the correct component from the correct repository.
 
-Verify:
+## Best Practices
 
-* Repository name
-* Maven groupId
-* Maven artifactId
-* Maven version
-
----
-
-# References
-
-* Sonatype Nexus Repository Manager Documentation
-* Nexus REST API Documentation
-* Nexus User Token Documentation
+* Do not delete production release artifacts without approval.
+* Do not use plain-text passwords in commands.
+* Use a service account where possible.
+* Always verify before and after deletion.
+* Keep a record of deleted artifacts.
+* Follow company change management requirements.
