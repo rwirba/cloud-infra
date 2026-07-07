@@ -1,20 +1,98 @@
-DevOps Vulnerability Dashboard — Demo Description
+Prerequisites
+OpenSSL installed on your computer.
+The Base64-encoded certificate files.
+The password for the .p12 file (if applicable).
+Step 1 – Save the Base64 Content
 
-The DevOps Vulnerability Dashboard is a self-hosted, lightweight container security tool that continuously scans Docker images for known CVEs and surfaces the results in a clean, real-time web UI — no external SaaS, no agents, just a single Alpine-based container running Trivy, Nginx, and a small Python reporting layer.
+Save the Base64 text into separate files.
 
-In this demo, I walk through the dashboard end-to-end:
+Example:
 
-1. The stack in one container
-Built on Alpine Linux with Trivy for vulnerability scanning, supervisord to manage the scan and web processes, and Nginx to serve the dashboard — all packaged into a single Docker image and deployed via docker compose up. No cluster, no complex infra — just a Compose file and a port.
+certificate.p12.b64
+certificate.cer.b64
 
-2. Live vulnerability data
-The dashboard currently tracks 100+ images pulled from a Docker Hub namespace, each scanned by Trivy and broken down by severity — Critical, High, Medium, and Low. Every image row is clickable, expanding into a full CVE breakdown with package name, installed vs. fixed version, and a direct link to the CVE record.
+Ensure the files contain only the Base64 text with no additional spaces or characters.
 
-3. Redesigned UI
-I recently gave the dashboard a full visual overhaul — a proper dark-mode design system with consistent severity color-coding, KPI stat tiles summarizing total findings across the fleet, and a redesigned data table with better readability and hover states.
+Step 2 – Decode the Base64 Files
 
-4. New: vulnerability trend chart
-The headline feature of this demo is a brand-new trend chart that tracks total vulnerabilities by severity over time. Every scan cycle now appends a snapshot to a rolling history file, and the dashboard renders it as a live multi-line chart — hover anywhere on the timeline and a tooltip shows the exact Critical/High/Medium/Low counts for that scan, with a crosshair that snaps to the nearest data point. This turns the dashboard from a point-in-time snapshot into something you can actually use to answer "are we getting better or worse over time?"
+Run the following commands to convert the Base64 text into the original binary files.
 
-5. How it fits into a DevOps workflow
-I'll show how new images get added to the scan list, how a scan cycle runs, and how the report and history files are generated and served — the same mechanism that would sit behind a CI pipeline gate or a nightly security review process for a team's container registry.
+Decode the PKCS#12 (.p12) file
+base64 -d certificate.p12.b64 > certificate.p12
+Decode the Certificate (.cer) file
+base64 -d certificate.cer.b64 > certificate.cer
+
+You should now have:
+
+certificate.p12
+certificate.cer
+Step 3 – Extract the Certificate and Private Key from the P12 File
+
+Run:
+
+openssl pkcs12 -in certificate.p12 -nodes -out certificate.pem
+
+You will be prompted for the .p12 password.
+
+The output file (certificate.pem) contains both:
+
+The certificate
+The private key
+Step 4 – Extract Only the Private Key (Optional)
+
+If you need only the private key:
+
+openssl pkey -in certificate.pem -out private.key
+
+The file will begin with:
+
+-----BEGIN PRIVATE KEY-----
+Step 5 – Extract Only the Certificate (Optional)
+
+If you need only the certificate:
+
+openssl x509 -in certificate.pem -out certificate.crt
+
+The output will begin with:
+
+-----BEGIN CERTIFICATE-----
+Step 6 – Convert the CER File to PEM Format
+
+If the .cer file does not already contain the PEM headers, convert it using:
+
+openssl x509 -inform DER -in certificate.cer -out certificate_from_cer.pem
+
+If the command returns an error, the .cer file may already be PEM encoded. In that case, use:
+
+openssl x509 -in certificate.cer -out certificate_from_cer.pem
+Step 7 – Verify the Output
+
+To view the certificate details:
+
+openssl x509 -in certificate.crt -text -noout
+
+To verify the private key:
+
+openssl pkey -in private.key -check
+Expected Output Files
+File	Purpose
+certificate.p12	Decoded PKCS#12 file
+certificate.cer	Decoded certificate
+certificate.pem	Certificate and private key combined
+certificate.crt	Certificate only
+private.key	Private key only
+PEM Headers
+
+A valid certificate should begin with:
+
+-----BEGIN CERTIFICATE-----
+
+A valid private key should begin with:
+
+-----BEGIN PRIVATE KEY-----
+
+or
+
+-----BEGIN RSA PRIVATE KEY-----
+
+depending on the type of key.
