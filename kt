@@ -1,121 +1,198 @@
-CI/CD Pipeline Documentation
-GitHub Actions + Docker + Helm on AKS
-(Using JFrog Artifactory as Container Registry)
-Last Updated: February 19, 2026
-Purpose: This document captures the full knowledge transfer session explaining how the team builds, containers, and deploys multiple services (including the Order Experience application) using GitHub Actions. Services can be either Java (Maven-based) or Node.js applications. The pipeline supports both types with the same overall structure.
-1. Overview
-Main tools used:
+---
+- name: Upgrade Apache ActiveMQ Classic to 5.19.7
+  hosts: activemq_servers
+  become: true
+  gather_facts: true
+  serial: 1
 
-GitHub Actions (for automation)
-JFrog Artifactory (private container registry for storing Docker images)
-Docker (to build and push container images)
-Helm charts (to deploy to Kubernetes)
-Azure Kubernetes Service (AKS)
-Self-hosted runners (specific runner group)
-Build tools: Maven for Java applications, npm/yarn for Node.js applications
+  vars:
+    activemq_version: "5.19.7"
+    activemq_home: /opt/activemq
+    activemq_install_dir: "{{ activemq_home }}/apache-activemq-{{ activemq_version }}"
+    activemq_current_link: "{{ activemq_home }}/current"
+    activemq_service: activemq
+    activemq_user: activemq
+    activemq_group: activemq
+    activemq_broker_port: 61616
+    activemq_archive: "apache-activemq-{{ activemq_version }}-bin.tar.gz"
+    activemq_download_url: >-
+      https://archive.apache.org/dist/activemq/{{ activemq_version }}/{{ activemq_archive }}
+    activemq_checksum_url: "{{ activemq_download_url }}.sha512"
+    activemq_download_path: "/var/tmp/{{ activemq_archive }}"
+    activemq_backup_dir: >-
+      {{ activemq_home }}/backups/activemq-{{ ansible_date_time.iso8601_basic_short }}
 
-Environments and triggers:
+  pre_tasks:
+    - name: Confirm the current symlink exists
+      ansible.builtin.stat:
+        path: "{{ activemq_current_link }}"
+        follow: false
+      register: current_link
 
+    - name: Stop when the installation does not use the expected current symlink
+      ansible.builtin.assert:
+        that:
+          - current_link.stat.exists
+          - current_link.stat.islnk
+        fail_msg: >-
+          {{ activemq_current_link }} must be a symbolic link to the current
+          ActiveMQ installation before this playbook can safely upgrade it.
 
+    - name: Resolve the existing ActiveMQ installation
+      ansible.builtin.command: "readlink -f {{ activemq_current_link }}"
+      register: current_install
+      changed_when: false
 
+    - name: Set upgrade state
+      ansible.builtin.set_fact:
+        activemq_previous_dir: "{{ current_install.stdout }}"
+        activemq_upgrade_required: "{{ current_install.stdout != activemq_install_dir }}"
 
+    - name: Confirm Java 11 or newer is installed
+      ansible.builtin.shell: |
+        set -o pipefail
+        java -version 2>&1 | awk -F '[".]' '/version/ { if ($2 == "1") print $3; else print $2 }'
+      args:
+        executable: /bin/bash
+      register: java_major
+      changed_when: false
+      failed_when: java_major.stdout | int < 11
 
+  tasks:
+    - name: Upgrade ActiveMQ
+      when: activemq_upgrade_required | bool
+      block:
+        - name: Download ActiveMQ and verify its Apache SHA-512 checksum
+          ansible.builtin.get_url:
+            url: "{{ activemq_download_url }}"
+            dest: "{{ activemq_download_path }}"
+            checksum: "sha512:{{ activemq_checksum_url }}"
+            mode: "0644"
+          register: activemq_download
 
+        - name: Extract the new ActiveMQ release
+          ansible.builtin.unarchive:
+            src: "{{ activemq_download_path }}"
+            dest: "{{ activemq_home }}"
+            remote_src: true
+            creates: "{{ activemq_install_dir }}/bin/activemq"
 
+        - name: Set ownership on the new installation
+          ansible.builtin.file:
+            path: "{{ activemq_install_dir }}"
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
+            recurse: true
 
+        - name: Stop ActiveMQ before copying configuration and persistent data
+          ansible.builtin.systemd_service:
+            name: "{{ activemq_service }}"
+            state: stopped
 
+        - name: Create a timestamped rollback backup
+          ansible.builtin.file:
+            path: "{{ activemq_backup_dir }}"
+            state: directory
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
+            mode: "0750"
 
+        - name: Back up the existing configuration and KahaDB data
+          ansible.builtin.copy:
+            src: "{{ item.src }}"
+            dest: "{{ activemq_backup_dir }}/{{ item.dest }}"
+            remote_src: true
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
+            mode: preserve
+          loop:
+            - src: "{{ activemq_previous_dir }}/conf/activemq.xml"
+              dest: activemq.xml
+            - src: "{{ activemq_previous_dir }}/conf/login.config"
+              dest: login.config
+            - src: "{{ activemq_previous_dir }}/data/kahadb/"
+              dest: kahadb/
 
+        - name: Migrate the existing broker configuration
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "{{ activemq_install_dir }}/conf/{{ item | basename }}"
+            remote_src: true
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
+            mode: preserve
+          loop:
+            - "{{ activemq_previous_dir }}/conf/activemq.xml"
+            - "{{ activemq_previous_dir }}/conf/login.config"
 
+        - name: Ensure the broker bean has the ID required by ActiveMQ 5.19.7
+          ansible.builtin.replace:
+            path: "{{ activemq_install_dir }}/conf/activemq.xml"
+            regexp: '(<broker\s+)(?![^>]*\bid=)'
+            replace: '\1id="broker" '
+            backup: true    
 
+        - name: Migrate KahaDB persistent data
+          ansible.builtin.copy:
+            src: "{{ activemq_previous_dir }}/data/kahadb/"
+            dest: "{{ activemq_install_dir }}/data/kahadb/"
+            remote_src: true
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
+            mode: preserve
 
+        - name: Point current symlink to ActiveMQ 5.19.7
+          ansible.builtin.file:
+            src: "{{ activemq_install_dir }}"
+            dest: "{{ activemq_current_link }}"
+            state: link
+            force: true
+            owner: "{{ activemq_user }}"
+            group: "{{ activemq_group }}"
 
+        - name: Reload systemd and start ActiveMQ
+          ansible.builtin.systemd_service:
+            name: "{{ activemq_service }}"
+            daemon_reload: true
+            enabled: true
+            state: started
 
+        - name: Wait for the broker port
+          ansible.builtin.wait_for:
+            host: 127.0.0.1
+            port: "{{ activemq_broker_port }}"
+            delay: 3
+            timeout: 90
 
+        - name: Verify the systemd service is active
+          ansible.builtin.command: "systemctl is-active {{ activemq_service }}"
+          register: activemq_status
+          changed_when: false
+          failed_when: activemq_status.stdout | trim != 'active'
 
+      rescue:
+        - name: Restore the previous current symlink
+          ansible.builtin.file:
+            src: "{{ activemq_previous_dir }}"
+            dest: "{{ activemq_current_link }}"
+            state: link
+            force: true
 
+        - name: Restart the previous ActiveMQ installation
+          ansible.builtin.systemd_service:
+            name: "{{ activemq_service }}"
+            daemon_reload: true
+            state: restarted
 
+        - name: Report failed upgrade and successful rollback attempt
+          ansible.builtin.fail:
+            msg: >-
+              ActiveMQ {{ activemq_version }} failed to start or validate.
+              The current symlink was restored to {{ activemq_previous_dir }}
+              and the service restart was requested. Inspect
+              {{ activemq_previous_dir }}/data/activemq.log and journalctl.
 
-
-
-
-
-EnvironmentHow it gets deployedApproval needed?DevAutomatically when code is merged to develop branchNoStageManually triggeredYesProdManually triggeredYes
-Four services are already running using this pattern. New services follow the same process.
-2. Workflow Steps – Build Phase (CI)
-
-Checkout the source code from the repository
-Read configuration files (application.properties for Java, .env or similar for Node.js)
-Run code and security scanning tools
-Build the application
-For Java applications: run Maven clean and package to create the JAR/WAR file
-For Node.js applications: install dependencies and run the build command (if applicable)
-
-Apply conditional rules (some steps are skipped on production branch)
-Set corporate HTTP proxy (required for downloads during build)
-Log in to JFrog Artifactory container registry
-Build the Docker image using the Dockerfile in the project root
-The application listens on port 3000 inside the container (same for both Java and Node.js)
-
-Tag and push the Docker image to JFrog Artifactory
-Images are stored with tags that include commit SHA or branch name
-
-
-3. Workflow Steps – Deploy Phase (CD)
-
-Log in to Azure using service principal credentials
-Set context to the target AKS cluster
-Read the Helm chart for the service
-Apply environment-specific configuration values (different files for dev, stage, prod)
-Perform Helm upgrade or install to deploy or update the application in Kubernetes
-After deployment: environment variables are injected, services, ingress rules, secrets, and volumes are applied
-
-4. Helm Chart Configuration (Key Settings)
-Each service uses its own Helm chart containing:
-
-Number of replicas
-Docker image repository and tag (points to JFrog Artifactory)
-Service type and port (usually ClusterIP on port 3000)
-CPU and memory requests & limits
-Volume definitions and mounts
-Secret references (database credentials, API keys, etc.)
-Ingress configuration (DNS name and TLS certificate)
-
-5. Branching and Deployment Rules
-
-When a developer creates a feature branch from develop and merges it back to develop → the pipeline automatically builds the image, pushes it to JFrog, and deploys it to the Dev environment.
-For Stage or Production:
-Go to GitHub Actions
-Select the workflow
-Click “Run workflow”
-Choose the branch and target environment
-Wait for approval (required for Stage and Prod)
-
-
-6. Runner Setup
-
-All jobs run on self-hosted runners
-Runners are enrolled in a specific runner group
-The same runner group is used across all services
-
-7. Required Secrets (Stored in GitHub)
-
-JFrog Artifactory username and access token
-Azure credentials (client ID, tenant ID, subscription ID, client secret)
-Application-specific secrets (different values per environment)
-
-8. Typical Repository Folder Structure
-Java application:
-
-Source code folder
-pom.xml (Maven file)
-settings.xml (proxy and repository settings)
-Dockerfile
-Helm chart folder with environment-specific value files
-
-Node.js application:
-
-Source code folder
-package.json
-Dockerfile
-Helm chart folder with environment-specific value files
+    - name: Report that ActiveMQ is already at the requested version
+      ansible.builtin.debug:
+        msg: "ActiveMQ {{ activemq_version }} is already active; no upgrade was needed."
+      when: not (activemq_upgrade_required | bool)
