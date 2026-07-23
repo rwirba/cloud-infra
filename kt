@@ -196,3 +196,10 @@
       ansible.builtin.debug:
         msg: "ActiveMQ {{ activemq_version }} is already active; no upgrade was needed."
       when: not (activemq_upgrade_required | bool)
+
+
+
+  sudo grep -RInE 'ACTIVEMQ_(HOME|BASE|CONF)|JAVA_HOME|ACTIVEMQ_OPTS|ACTIVEMQ_DATA' \
+  /opt/activemq/current/bin/env \
+  /etc/default/activemq \
+  /etc/sysconfig/activemq 2>/dev/null
