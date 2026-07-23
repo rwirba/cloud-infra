@@ -464,8 +464,8 @@
   tags:
     - upgrade
 
-docker run --rm \
-  -v "$PWD:/project" \
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "$(pwd -W):/project" \
   -w /project \
   python:3.12-slim \
   sh -c "pip install --no-cache-dir yamllint && yamllint upgrade-activemq.yaml roles/amq/tasks/main.yaml roles/amq/vars/main.yaml"
