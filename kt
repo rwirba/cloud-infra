@@ -463,3 +463,9 @@
   when: not (activemq_upgrade_required | bool)
   tags:
     - upgrade
+
+docker run --rm \
+  -v "$PWD:/project" \
+  -w /project \
+  python:3.12-slim \
+  sh -c "pip install --no-cache-dir yamllint && yamllint upgrade-activemq.yaml roles/amq/tasks/main.yaml roles/amq/vars/main.yaml"
