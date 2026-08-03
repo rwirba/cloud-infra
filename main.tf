@@ -191,4 +191,3 @@ resource "aws_instance" "ansible-runner" {
     Name = "Ansible-runner"
   }
 }
-#
